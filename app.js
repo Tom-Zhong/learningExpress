@@ -20,13 +20,18 @@ var parseForm = bodyParser.urlencoded({ extended: false }); // 对表单的请�
 var timeout = require('connect-timeout'); //连接超时控制
 var errorhandler = require('errorhandler'); // 基本错误处理器
 var favicon = require('serve-favicon'); //网站小图标
+var vhost = require('vhost');// 引入vhost
 var index = require('./routes/index');
 var users = require('./routes/users');
 var changecolor = require('./routes/changecolor');
 
 
 var app = express();
-
+// 引入其他子站点，并且通过中间件形式控制
+var mobile = require('./vhost/mobile');
+var api = require('./vhost/api');
+app.use(vhost('m.hackhall.com', mobile));
+app.use(vhost('api.hackhall.com', api));
 // 引入json数据
 var book = require('./js/book');
 
