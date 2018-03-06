@@ -16,6 +16,7 @@ var session = require('express-session'); // 会话引入
 var parseurl = require('parseurl'); //对请求地址进行转换
 var csrf = require('csurf'); // 防止跨站请求伪造
 var timeout = require('connect-timeout'); //连接超时控制
+var errorhandler = require('errorhandler'); // 基本错误处理器
 var index = require('./routes/index');
 var users = require('./routes/users');
 var changecolor = require('./routes/changecolor');
@@ -55,6 +56,9 @@ app.use(compression({threshold: 1})) // 压缩传输的文件，加快传输和�
 app.use(logger('dev')); // 在服务器中打印相应的信息，方便进行服务器观察
 app.use(methodOverride('_method')); // 兼容不支持put和delete方法的浏览器通过post和request-header来模拟请求
 app.use(responseTime({digits: 4})); // 响应超时时间限制
+if(app.get('env') === 'development'){
+  app.use(errorhandler());
+}
 app.use('/shared', express.static(path.join(__dirname, 'public')), serveIndex(path.join(__dirname, 'public'), {'icons': true})); //文件下载,
 app.use(bodyParser.json()); // 对客户端传来的文件类型进行处理
 app.use(bodyParser.urlencoded({ extended: false }));
