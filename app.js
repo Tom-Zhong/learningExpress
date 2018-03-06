@@ -11,7 +11,10 @@ var compression = require('compression'); // 自动压缩传输的内容
 var methodOverride = require('method-override'); //让不支持put或者delete的网站也能正常用post加header请求
 var responseTime = require('response-time'); //规定网站响应时间
 var serveIndex = require('serve-index'); // 网站内容共享
-
+var busboy = require('connect-busboy'); //上传插件
+var session = require('express-session'); // 会话引入
+var parseurl = require('parseurl'); //对请求地址进行转换
+var csrf = require('csurf'); // 防止跨站请求伪造
 var index = require('./routes/index');
 var users = require('./routes/users');
 var changecolor = require('./routes/changecolor');
@@ -47,19 +50,59 @@ app.set('x-powered-by', false)
 app.set('subdomain offset', 3)
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
-app.use(compression({threshold: 1}))
-app.use(logger('dev'));
+app.use(compression({threshold: 1})) // 压缩传输的文件，加快传输和减少带宽，但增加了服务器处理数据压力
+app.use(logger('dev')); // 在服务器中打印相应的信息，方便进行服务器观察
 app.use(methodOverride('_method')); // 兼容不支持put和delete方法的浏览器通过post和request-header来模拟请求
 app.use(responseTime({digits: 4})); // 响应超时时间限制
-app.use('/shared', express.static(path.join(__dirname, 'public')), serveIndex('public', {'icons': true})); //文件下载
-app.use(bodyParser.json());
+app.use('/shared', express.static(path.join(__dirname, 'public')), serveIndex(path.join(__dirname, 'public'), {'icons': true})); //文件下载,
+app.use(bodyParser.json()); // 对客户端传来的文件类型进行处理
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
+
+// session的使用，设置页面计数器，访问超过60秒的话自动清除相应的seesion
+app.use(session({secret: 'keyboard cat', resave: false, saveUninitialized: true}))
+app.use(function (req, res, next) {
+  if(!req.session.views){
+    req.session.views = {}
+  }
+  console.log(req.session.views)
+  var pathname = parseurl(req).pathname;
+  req.session.cookie.maxAge = 60000;
+  // count thei views
+  req.session.views[pathname] = (req.session.views[pathname] || 0 ) + 1
+
+  next()
+})
+
+app.get('/foo', function (req, res, next) {
+  res.send('you viewed this page ' + req.session.views['/foo'] + ' times!')
+})
+app.get('/bar', function (req, res, next) {
+  res.send('you viewed this page ' + req.session.views['/bar'] + ' times!')
+})
+
+
+app.use(cookieParser());  // 将客户端传来的cookie加入到req请求头中，然后传入给下一个中间件使用
+app.use(csrf()); // 防止跨站伪造请求
 app.use(lessMiddleware(path.join(__dirname, 'public')));
 app.use('/css', express.static(path.join(__dirname, 'public/stylesheets')));
 app.use('/imgs', express.static(path.join(__dirname, 'public/images')));
 app.use('/js',express.static(path.join(__dirname, 'public/javascripts')));
-
+// 上传控件
+app.use('/upload', busboy({immediate: true}));
+app.use('/upload', function (req, res) {
+  req.busboy.on('file', function (fieldname, file, filename, encoding, mimetype) {
+    file.on('data', function (data){
+      fs.writeFile('upload' + fieldname + filename, data);
+    })
+    file.on('end', function () {
+      console.log('File ' + filename + ' is ended')
+    })
+  });
+  req.busboy.on('finish', function (){
+    console.log('Busboy is finished');
+    res.status(201).end();
+  })
+})
 
 app.use(function (req, res, next){
   console.log('%s %s - %s', (new Date).toString(), req.method, req.url);
