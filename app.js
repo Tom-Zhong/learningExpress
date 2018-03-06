@@ -15,6 +15,7 @@ var busboy = require('connect-busboy'); //上传插件
 var session = require('express-session'); // 会话引入
 var parseurl = require('parseurl'); //对请求地址进行转换
 var csrf = require('csurf'); // 防止跨站请求伪造
+var timeout = require('connect-timeout'); //连接超时控制
 var index = require('./routes/index');
 var users = require('./routes/users');
 var changecolor = require('./routes/changecolor');
@@ -112,6 +113,19 @@ app.use('/', index);
 app.use('/users', users);
 app.use('/color', changecolor);
 
+// 连接超时一般是在需要处理大量请求的请求路由中。
+app.get(
+  '/slow-request', 
+  timeout('1s'), 
+  function (req, res,next) {
+    setTimeout(function () {
+      if (req.timedout)return false;
+      return next();
+    }, 999 + Math.round(Math.random()));
+  }, function (req, res, next) {
+    res.send('ok')
+  }
+)
 app.get('/jsonp', function (req, res) {
   res.jsonp(book);
 })
