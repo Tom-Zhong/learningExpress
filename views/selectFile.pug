@@ -1,0 +1,8 @@
+<form method="POST" enctype="multipart/form-data" action="/profile">
+  //- 通过添加csrfToken，可以有效防止跨站伪造请求
+  input(type="hidden" name="_csrf" value=csrfToken)
+  <input type="text" name="username">
+  <input type="password" name="password">
+  <input type="file" name="avatar">
+  <input type="submit">
+</form>

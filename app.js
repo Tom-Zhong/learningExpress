@@ -11,7 +11,7 @@ var compression = require('compression'); // 自动压缩传输的内容
 var methodOverride = require('method-override'); //让不支持put或者delete的网站也能正常用post加header请求
 var responseTime = require('response-time'); //规定网站响应时间
 var serveIndex = require('serve-index'); // 网站内容共享
-var busboy = require('connect-busboy'); //上传插件
+// var busboy = require('connect-busboy'); //上传插件
 var session = require('express-session'); // 会话引入
 var parseurl = require('parseurl'); //对请求地址进行转换
 var csrf = require('csurf'); // 防止跨站请求伪造
@@ -21,6 +21,9 @@ var timeout = require('connect-timeout'); //连接超时控制
 var errorhandler = require('errorhandler'); // 基本错误处理器
 var favicon = require('serve-favicon'); //网站小图标
 var vhost = require('vhost');// 引入vhost
+var multer  = require('multer') //比较好用的上传中间件
+var crypto = require('crypto'); // 给文件加密
+var md5 = crypto.createHash('md5');
 var index = require('./routes/index');
 var users = require('./routes/users');
 var changecolor = require('./routes/changecolor');
@@ -77,7 +80,6 @@ app.use(function (req, res, next) {
   if(!req.session.views){
     req.session.views = {}
   }
-  console.log(req.session.views)
   var pathname = parseurl(req).pathname;
   req.session.cookie.maxAge = 60000;
   // count thei views
@@ -100,22 +102,44 @@ app.use(lessMiddleware(path.join(__dirname, 'public')));
 app.use('/css', express.static(path.join(__dirname, 'public/stylesheets')));
 app.use('/imgs', express.static(path.join(__dirname, 'public/images')));
 app.use('/js',express.static(path.join(__dirname, 'public/javascripts')));
-// 上传控件
-app.use('/upload', busboy({immediate: true}));
-app.use('/upload', function (req, res) {
-  req.busboy.on('file', function (fieldname, file, filename, encoding, mimetype) {
-    file.on('data', function (data){
-      fs.writeFile('upload' + fieldname + filename, data);
-    })
-    file.on('end', function () {
-      console.log('File ' + filename + ' is ended')
-    })
-  });
-  req.busboy.on('finish', function (){
-    console.log('Busboy is finished');
-    res.status(201).end();
-  })
-})
+
+
+// 给上传的中间件multer设置初始参数
+var storage = multer.diskStorage({
+  //设置上传后文件路径，uploads文件夹会自动创建。
+     destination: function (req, file, cb) {
+        console.log(file);
+        cb(null, './public/upload')
+    }, 
+  //给上传文件重命名，获取添加后缀名
+   filename: function (req, file, cb) {
+       var fileFormat = (file.originalname).split(".");
+       cb(null, file.fieldname + '-' + Date.now() + "." + fileFormat[fileFormat.length - 1]);
+   },
+   
+}); 
+var upload = multer({
+  storage: storage,
+  fileFilter: function (req, file, cb) {
+    console.log('处理文件后缀的问题')
+    var startIndex=file.originalname.lastIndexOf(".");
+    var endIndex=file.originalname.length;
+    var postf = file.originalname.substring(startIndex+1,endIndex);//后缀名  
+    console.log('文件的后缀名为' + postf);
+    if (postf === 'ico'){
+      console.log('被接受的文件名')
+      cb(null, true)
+      return;
+    }
+    else {
+      console.log('不被接受的文件名')
+      cb(null, false)
+      return ;
+    }
+    // // You can always pass an error if something goes wrong:
+    cb(new Error('I don\'t have a clue!'))
+  }
+});
 
 app.use(function (req, res, next){
   console.log('%s %s - %s', (new Date).toString(), req.method, req.url);
@@ -129,6 +153,21 @@ app.get('/send', csrfProtection, function(req, res) {
 // 使用method-override让服务器支持某些只支持get和post的浏览，让他们通过get或者post方法加请求头完成更多请求
 app.delete('/purchase-orders', parseForm, csrfProtection, function (req, res) {
   res.send('THE DELETE route has been triggered!').status(200);
+})
+app.get('/selectFile',csrfProtection, function (req, res){
+  res.render('selectFile', { csrfToken: req.csrfToken() })
+})
+// 只对上传字段中avatar进行操作
+app.post('/profile', upload.single('avatar'), parseForm, csrfProtection, function (req, res, next) {
+  // req.file 是 `avatar` 文件
+  // req.body 对象中是表单中提交的文本字段(如果有)
+  console.log('上传的文件的信息: ' + req.file) //自动将文件处理并且给出文件信息
+  // console.log(req.body); // 自动将表单数据进行处理
+  if(req.file === undefined){
+    res.status(403).end('not ok, the file type is illegal!')
+  }else {
+    res.status(200).end('The file has success to upload!');
+  }
 })
 app.use('/', index);
 app.use('/users', users);
