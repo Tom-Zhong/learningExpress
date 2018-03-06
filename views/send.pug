@@ -1,0 +1,6 @@
+<form action="/purchase-orders?_method=DELETE" method="POST">
+  //- 通过添加csrfToken，可以有效防止跨站伪造请求
+  input(type="hidden" name="_csrf" value=csrfToken)
+  Favorite color: <input type="text" name="favoriteColor">
+  <button type="submit">Submit</button>
+</form>

@@ -15,8 +15,11 @@ var busboy = require('connect-busboy'); //上传插件
 var session = require('express-session'); // 会话引入
 var parseurl = require('parseurl'); //对请求地址进行转换
 var csrf = require('csurf'); // 防止跨站请求伪造
+var csrfProtection = csrf({ cookie: true }); // 使用cookie作为csrf的容器
+var parseForm = bodyParser.urlencoded({ extended: false }); // 对表单的请求进行解码
 var timeout = require('connect-timeout'); //连接超时控制
 var errorhandler = require('errorhandler'); // 基本错误处理器
+var favicon = require('serve-favicon'); //网站小图标
 var index = require('./routes/index');
 var users = require('./routes/users');
 var changecolor = require('./routes/changecolor');
@@ -77,7 +80,7 @@ app.use(function (req, res, next) {
 
   next()
 })
-
+// 这里是会自动显示次数的页面，但是生存周期仅仅是存系在session中
 app.get('/foo', function (req, res, next) {
   res.send('you viewed this page ' + req.session.views['/foo'] + ' times!')
 })
@@ -87,7 +90,7 @@ app.get('/bar', function (req, res, next) {
 
 
 app.use(cookieParser());  // 将客户端传来的cookie加入到req请求头中，然后传入给下一个中间件使用
-app.use(csrf()); // 防止跨站伪造请求
+app.use(favicon(path.join(__dirname, 'public', 'favicon.ico'))); //托管网站小图标
 app.use(lessMiddleware(path.join(__dirname, 'public')));
 app.use('/css', express.static(path.join(__dirname, 'public/stylesheets')));
 app.use('/imgs', express.static(path.join(__dirname, 'public/images')));
@@ -113,9 +116,20 @@ app.use(function (req, res, next){
   console.log('%s %s - %s', (new Date).toString(), req.method, req.url);
   return next();
 });
+
+app.get('/send', csrfProtection, function(req, res) {
+  // pass the csrfToken to the view 
+  res.render('send', { csrfToken: req.csrfToken() })
+})
+// 使用method-override让服务器支持某些只支持get和post的浏览，让他们通过get或者post方法加请求头完成更多请求
+app.delete('/purchase-orders', parseForm, csrfProtection, function (req, res) {
+  res.send('THE DELETE route has been triggered!').status(200);
+})
 app.use('/', index);
 app.use('/users', users);
 app.use('/color', changecolor);
+
+
 
 // 连接超时一般是在需要处理大量请求的请求路由中。
 app.get(
